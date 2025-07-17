@@ -104,8 +104,8 @@ Erstellen Sie eine `.env`-Datei im Projektroot:
 PORT=3001
 
 # Authentifizierung (an httpasswd anpassen)
-AUTH_USER=admin
-AUTH_PASS=ihr_passwort
+AUTH_USER=download
+AUTH_PASS=download
 
 # Pfade
 MOUNT_PATH=/mnt/onedrive/bootimages/windows
@@ -121,7 +121,7 @@ DOMAIN=dl.terhorst.io
 ### Apache htpasswd
 ```bash
 # Benutzer erstellen/ändern
-sudo htpasswd /etc/apache2/.htpasswd admin
+sudo htpasswd /etc/apache2/.htpasswd download
 ```
 
 ## 🏃‍♂️ Verwendung
@@ -285,7 +285,7 @@ sudo systemctl reload apache2
 sudo cat /etc/apache2/.htpasswd
 
 # Neuen Benutzer erstellen
-sudo htpasswd /etc/apache2/.htpasswd admin
+sudo htpasswd /etc/apache2/.htpasswd download
 ```
 
 #### "ISO-Erstellung fehlgeschlagen"

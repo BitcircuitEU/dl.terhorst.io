@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UUP Dump Frontend - Windows Image Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-light">
+    <nav class="navbar navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-compact-disc me-2"></i>
+                UUP Dump Frontend
+            </a>
+            <span class="navbar-text">
+                <i class="fas fa-server me-1"></i>
+                dl.terhorst.io
+            </span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Tabs Navigation -->
+        <ul class="nav nav-pills mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="images-tab" data-bs-toggle="pill" data-bs-target="#images" type="button" role="tab">
+                    <i class="fas fa-hdd me-2"></i>Meine Images
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="builds-tab" data-bs-toggle="pill" data-bs-target="#builds" type="button" role="tab">
+                    <i class="fas fa-download me-2"></i>Windows Builds
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="mainTabsContent">
+            <!-- Images Tab -->
+            <div class="tab-pane fade show active" id="images" role="tabpanel">
+                <div class="card bg-secondary">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-hdd me-2"></i>Gespeicherte Images
+                        </h5>
+                        <button class="btn btn-outline-light" id="refreshImages">
+                            <i class="fas fa-sync-alt me-2"></i>Aktualisieren
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Loading Spinner -->
+                        <div id="imagesLoading" class="text-center py-4 d-none">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2">Images werden geladen...</p>
+                        </div>
+
+                        <!-- Images List -->
+                        <div id="imagesList" class="row"></div>
+                        
+                        <!-- Empty State -->
+                        <div id="imagesEmpty" class="text-center py-5 d-none">
+                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                            <h6 class="text-muted">Keine Images gefunden</h6>
+                            <p class="text-muted">Verzeichnis /mnt/onedrive/bootimages ist leer oder nicht verfügbar.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Windows Builds Tab -->
+            <div class="tab-pane fade" id="builds" role="tabpanel">
+                <div class="card bg-secondary">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-search me-2"></i>Windows Builds durchsuchen
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search Controls -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control" id="searchInput" placeholder="Build durchsuchen...">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-outline-light w-100" id="refreshBuilds">
+                                    <i class="fas fa-sync-alt me-2"></i>Aktualisieren
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Loading Spinner -->
+                        <div id="buildsLoading" class="text-center py-4 d-none">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2">Builds werden geladen...</p>
+                        </div>
+
+                        <!-- Builds List -->
+                        <div id="buildsList" class="row"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Progress Modal -->
+        <div class="modal fade" id="progressModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-secondary">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-download me-2"></i>Download läuft
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <div id="progressContent">
+                            <!-- Progress wird hier dynamisch geladen -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="closeProgress" disabled>Schließen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language/Edition Selection Modal -->
+        <div class="modal fade" id="selectionModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content bg-secondary">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Download konfigurieren</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="languageSelect" class="form-label">Sprache auswählen:</label>
+                            <select class="form-select" id="languageSelect">
+                                <option value="">Sprache wird geladen...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editionSelect" class="form-label">Edition auswählen:</label>
+                            <select class="form-select" id="editionSelect" disabled>
+                                <option value="">Erst Sprache auswählen</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="button" class="btn btn-primary" id="startDownload" disabled>Download starten</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html> 

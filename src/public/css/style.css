@@ -1,0 +1,262 @@
+/* Custom CSS für UUP Dump Frontend */
+
+:root {
+    --bs-primary: #0d6efd;
+    --bs-secondary: #495057;
+    --bs-dark: #212529;
+    --bs-body-bg: #121212;
+    --bs-body-color: #e9ecef;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.card {
+    border: 1px solid #495057;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.build-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #495057;
+    background-color: #343a40;
+}
+
+.build-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+    border-color: var(--bs-primary);
+}
+
+.image-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #495057;
+    background-color: #343a40;
+}
+
+.image-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+.progress-stage {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    background-color: #495057;
+}
+
+.progress-stage.active {
+    background-color: rgba(13, 110, 253, 0.2);
+    border: 1px solid var(--bs-primary);
+}
+
+.progress-stage.completed {
+    background-color: rgba(25, 135, 84, 0.2);
+    border: 1px solid #198754;
+}
+
+.progress-stage .stage-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    background-color: #6c757d;
+    color: white;
+}
+
+.progress-stage.active .stage-icon {
+    background-color: var(--bs-primary);
+}
+
+.progress-stage.completed .stage-icon {
+    background-color: #198754;
+}
+
+.stage-details {
+    flex: 1;
+}
+
+.stage-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.stage-description {
+    color: #adb5bd;
+    font-size: 0.875rem;
+    margin-bottom: 0;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.btn-outline-light:hover {
+    background-color: #f8f9fa;
+    border-color: #f8f9fa;
+    color: #212529;
+}
+
+.nav-pills .nav-link {
+    background-color: transparent;
+    border: 1px solid #495057;
+    color: #adb5bd;
+}
+
+.nav-pills .nav-link:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-color: var(--bs-primary);
+    color: #e9ecef;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.modal-content {
+    border: 1px solid #495057;
+}
+
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.alert-dismissible .btn-close {
+    filter: brightness(1.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .build-card,
+    .image-card {
+        margin-bottom: 1rem;
+    }
+    
+    .progress-stage .stage-icon {
+        width: 35px;
+        height: 35px;
+        margin-right: 0.75rem;
+    }
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bs-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #495057;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6c757d;
+}
+
+/* Animation for loading spinners */
+.spinner-border {
+    animation: spinner-border 0.75s linear infinite;
+}
+
+@keyframes spinner-border {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Build card specific styles */
+.build-info {
+    font-size: 0.875rem;
+    color: #adb5bd;
+}
+
+.build-title {
+    font-weight: 600;
+    color: #e9ecef;
+    margin-bottom: 0.5rem;
+}
+
+.build-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.build-arch {
+    background-color: #495057;
+    color: #e9ecef;
+    border: 1px solid #6c757d;
+}
+
+/* Image card specific styles */
+.image-title {
+    font-weight: 600;
+    color: #e9ecef;
+    margin-bottom: 0.5rem;
+    word-break: break-all;
+}
+
+.image-info {
+    font-size: 0.875rem;
+    color: #adb5bd;
+}
+
+.image-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Progress bar enhancements */
+.progress {
+    height: 0.75rem;
+    background-color: #495057;
+}
+
+.progress-bar {
+    background-color: var(--bs-primary);
+    transition: width 0.3s ease;
+}
+
+/* Utility classes */
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.transition-all {
+    transition: all 0.2s ease-in-out;
+} 

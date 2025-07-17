@@ -20,13 +20,20 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3001;
 const UUP_API_BASE = 'https://api.uupdump.net';
-const MOUNT_PATH = '/mnt/onedrive/bootimages/windows';
+const MOUNT_PATH = '/mnt/onedrive/bootimages';
+const WINDOWS_PATH = '/mnt/onedrive/bootimages/windows';
 const TMP_PATH = '/tmp/uup-downloads';
+
+// Template Engine konfigurieren
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'src/views'));
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client/build')));
+app.use(express.urlencoded({ extended: true }));
+app.use('/static', express.static(path.join(__dirname, 'src/public')));
+app.use('/images', express.static(MOUNT_PATH));
 
 // Basic Authentication Middleware
 const authenticate = (req, res, next) => {
@@ -34,8 +41,8 @@ const authenticate = (req, res, next) => {
   
   // Hier sollten Sie Ihre httpasswd-Credentials überprüfen
   // Für Demo-Zwecke verwenden wir Umgebungsvariablen
-  const validUser = process.env.AUTH_USER || 'admin';
-  const validPass = process.env.AUTH_PASS || 'password';
+  const validUser = process.env.AUTH_USER || 'download';
+  const validPass = process.env.AUTH_PASS || 'download';
   
   if (!user || user.name !== validUser || user.pass !== validPass) {
     res.set('WWW-Authenticate', 'Basic realm="UUP Dump Frontend"');
@@ -47,6 +54,11 @@ const authenticate = (req, res, next) => {
 
 // Stelle sicher, dass tmp-Verzeichnis existiert
 fs.ensureDirSync(TMP_PATH);
+
+// Haupt-Route - Dashboard
+app.get('/', authenticate, (req, res) => {
+  res.render('index');
+});
 
 // API Routes
 
@@ -144,6 +156,45 @@ app.post('/api/download/:id', authenticate, async (req, res) => {
   }
 });
 
+// Rekursive Funktion zum Durchsuchen aller Unterordner
+async function findAllImages(dir, baseDir, images = []) {
+  try {
+    const files = await fs.readdir(dir);
+    
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stats = await fs.stat(filePath);
+      
+      if (stats.isDirectory()) {
+        // Rekursiv in Unterordner schauen
+        await findAllImages(filePath, baseDir, images);
+      } else if (stats.isFile()) {
+        // Prüfe auf relevante Dateierweiterungen
+        const ext = path.extname(file).toLowerCase();
+        if (['.iso', '.img', '.wim', '.esd', '.vhd', '.vhdx'].includes(ext)) {
+          const relativePath = path.relative(baseDir, filePath);
+          const category = path.dirname(relativePath) || 'Root';
+          
+          images.push({
+            name: file,
+            fullPath: relativePath,
+            category: category,
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime,
+            type: ext.substring(1).toUpperCase(),
+            path: `/images/${relativePath.replace(/\\/g, '/')}`
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Fehler beim Durchsuchen von ${dir}:`, error);
+  }
+  
+  return images;
+}
+
 // Hole vorhandene Images
 app.get('/api/images', authenticate, async (req, res) => {
   try {
@@ -151,19 +202,15 @@ app.get('/api/images', authenticate, async (req, res) => {
       return res.json({ images: [] });
     }
     
-    const files = await fs.readdir(MOUNT_PATH);
-    const images = files
-      .filter(file => file.toLowerCase().endsWith('.iso'))
-      .map(file => {
-        const filePath = path.join(MOUNT_PATH, file);
-        const stats = fs.statSync(filePath);
-        return {
-          name: file,
-          size: stats.size,
-          created: stats.birthtime,
-          path: `/images/${file}`
-        };
-      });
+    const images = await findAllImages(MOUNT_PATH, MOUNT_PATH);
+    
+    // Sortiere nach Kategorie und dann nach Name
+    images.sort((a, b) => {
+      if (a.category !== b.category) {
+        return a.category.localeCompare(b.category);
+      }
+      return a.name.localeCompare(b.name);
+    });
     
     res.json({ images });
   } catch (error) {
@@ -173,10 +220,16 @@ app.get('/api/images', authenticate, async (req, res) => {
 });
 
 // Lösche Image
-app.delete('/api/images/:filename', authenticate, async (req, res) => {
+app.delete('/api/images/*', authenticate, async (req, res) => {
   try {
-    const filename = req.params.filename;
-    const filePath = path.join(MOUNT_PATH, filename);
+    // Hole den kompletten Pfad nach /api/images/
+    const relativePath = decodeURIComponent(req.params[0]);
+    const filePath = path.join(MOUNT_PATH, relativePath);
+    
+    // Sicherheitsprüfung - Datei muss im MOUNT_PATH sein
+    if (!filePath.startsWith(MOUNT_PATH)) {
+      return res.status(400).json({ error: 'Ungültiger Dateipfad' });
+    }
     
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Image nicht gefunden' });
@@ -203,7 +256,7 @@ io.on('connection', (socket) => {
 async function startDownloadProcess(downloadData, socket) {
   const buildName = downloadData.updateName.replace(/[^a-zA-Z0-9\-_\.]/g, '_');
   const workDir = path.join(TMP_PATH, `${buildName}_${Date.now()}`);
-  const finalIsoPath = path.join(MOUNT_PATH, `${buildName}.iso`);
+  const finalIsoPath = path.join(WINDOWS_PATH, `${buildName}.iso`);
   
   try {
     await fs.ensureDir(workDir);
@@ -215,7 +268,7 @@ async function startDownloadProcess(downloadData, socket) {
     });
     
     // Verwende die echte UUP Dump API Integration
-    const { realDownloadProcess } = require('./uup-wrapper');
+    const { realDownloadProcess } = require('./src/uup-wrapper');
     await realDownloadProcess(socket, workDir, finalIsoPath, buildName, downloadData);
     
   } catch (error) {
@@ -233,12 +286,7 @@ async function startDownloadProcess(downloadData, socket) {
 }
 
 // Die Simulation wurde durch echte UUP Dump API Integration ersetzt
-// Siehe ./uup-wrapper.js für die vollständige Implementierung
-
-// Statische Dateien für React
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
-});
+// Siehe ./src/uup-wrapper.js für die vollständige Implementierung
 
 server.listen(PORT, () => {
   console.log(`Server läuft auf Port ${PORT}`);

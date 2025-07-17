@@ -9,7 +9,7 @@ echo "🚀 UUP Dump Frontend Deployment startet..."
 
 # Konfiguration
 DOMAIN="dl.terhorst.io"
-APP_DIR="/opt/dl.terhorst.io"
+APP_DIR="/opt/uup-frontend"
 SERVICE_NAME="uup-frontend"
 
 # Prüfe ob als root ausgeführt
@@ -43,15 +43,9 @@ if [ "$NODE_VERSION" -lt 22 ]; then
     apt-get install -y nodejs
 fi
 
-echo "📦 Installiere Server Dependencies (Haupt-package.json)..."
+echo "📦 Installiere Dependencies..."
 cd "$APP_DIR"
 npm install
-
-echo "📦 Installiere Client Dependencies (React Frontend)..."
-npm run install-client
-
-echo "🏗️ Build React Frontend..."
-npm run build
 
 echo "⚙️ Setup UUP Dump API-Tools..."
 # Installiere UUP-spezifische Pakete
@@ -167,9 +161,9 @@ echo "✅ UUP Dump API-Tools installiert"
 echo "📋 Erstelle Environment-Datei..."
 cat > "$APP_DIR"/.env << EOF
 PORT=3001
-AUTH_USER=admin
-AUTH_PASS=changeme
-MOUNT_PATH=/mnt/onedrive/bootimages/windows
+AUTH_USER=download
+AUTH_PASS=download
+MOUNT_PATH=/mnt/onedrive/bootimages
 TMP_PATH=/tmp/uup-downloads
 UUP_API_BASE=https://api.uupdump.net
 DOMAIN=$DOMAIN
@@ -177,18 +171,129 @@ EOF
 
 chmod 600 "$APP_DIR/.env"
 
+echo "🔧 Erstelle systemd Service..."
+cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
+[Unit]
+Description=UUP Dump Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+EnvironmentFile=$APP_DIR/.env
+
+# Logging
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=$SERVICE_NAME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "⚙️ Erstelle Apache Virtual Host..."
+cat > /etc/apache2/sites-available/$DOMAIN.conf << 'EOFAPACHE'
+<VirtualHost *:80>
+    ServerName dl.terhorst.io
+    Redirect permanent / https://dl.terhorst.io/
+</VirtualHost>
+
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+    ServerName dl.terhorst.io
+    DocumentRoot /var/www/html
+
+    # SSL-Konfiguration (wird von certbot automatisch hinzugefügt)
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/dl.terhorst.io/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/dl.terhorst.io/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
+    SSLCertificateChainFile /etc/letsencrypt/live/dl.terhorst.io/chain.pem
+
+    # Headers für Sicherheit
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+    # Direkte Bereitstellung der Images (ohne Auth für Downloads)
+    # WICHTIG: Muss vor dem Root-Proxy stehen!
+    Alias /images /mnt/onedrive/bootimages
+    <Directory "/mnt/onedrive/bootimages">
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+        
+        # Content-Type für ISO-Dateien
+        <FilesMatch "\.iso$">
+            Header set Content-Type "application/x-cd-image"
+            Header set Content-Disposition "attachment"
+        </FilesMatch>
+    </Directory>
+
+    # Proxy für Node.js App
+    ProxyPreserveHost On
+    ProxyRequests Off
+    
+    # UUP Frontend App unter Root (/)
+    <Location />
+        AuthType Basic
+        AuthName "UUP Dump Frontend Access"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        
+        ProxyPass http://127.0.0.1:3001/
+        ProxyPassReverse http://127.0.0.1:3001/
+        
+        # WebSocket-Support
+        RewriteEngine On
+        RewriteCond %{HTTP:Upgrade} websocket [NC]
+        RewriteCond %{HTTP:Connection} upgrade [NC]
+        RewriteRule ^/?(.*) "ws://127.0.0.1:3001/$1" [P,L]
+    </Location>
+
+    # Logs
+    ErrorLog ${APACHE_LOG_DIR}/dl.terhorst.io_error.log
+    CustomLog ${APACHE_LOG_DIR}/dl.terhorst.io_access.log combined
+</VirtualHost>
+</IfModule>
+EOFAPACHE
+
+echo "🔌 Aktiviere Apache Module..."
+a2enmod rewrite
+a2enmod ssl
+a2enmod proxy
+a2enmod proxy_http
+a2enmod proxy_wstunnel
+a2enmod headers
+
+echo "🌐 Aktiviere Virtual Host..."
+a2ensite $DOMAIN.conf
+a2dissite 000-default
+
+echo "🔄 Starte und aktiviere Services..."
+systemctl daemon-reload
+systemctl enable $SERVICE_NAME
+systemctl start $SERVICE_NAME
+systemctl reload apache2
+
 echo ""
 echo "🎉 Deployment abgeschlossen!"
 echo ""
 echo "📋 Zusammenfassung:"
-echo "   🌐 Website: https://$DOMAIN"
+echo "   🌐 Website: https://$DOMAIN/"
 echo "   📁 App-Verzeichnis: $APP_DIR"
 echo "   👤 Service-User: root"
 echo "   🔧 Service-Name: $SERVICE_NAME"
 echo ""
 echo "⚙️  Nächste Schritte:"
 echo "   1. Apache-Passwort setzen:"
-echo "      sudo htpasswd /etc/apache2/.htpasswd admin"
+echo "      sudo htpasswd /etc/apache2/.htpasswd download"
 echo ""
 echo "   2. Environment-Variablen anpassen:"
 echo "      sudo nano $APP_DIR/.env"
