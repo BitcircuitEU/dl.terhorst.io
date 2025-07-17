@@ -219,7 +219,7 @@ sudo journalctl -f -u uup-frontend
 ### Updates
 ```bash
 # Code aktualisieren (als root im App-Verzeichnis)
-cd /opt/uup-frontend
+cd /opt/dl.terhorst.io
 git pull origin main
 
 # Dependencies aktualisieren

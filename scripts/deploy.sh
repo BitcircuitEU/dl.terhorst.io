@@ -9,7 +9,7 @@ echo "🚀 UUP Dump Frontend Deployment startet..."
 
 # Konfiguration
 DOMAIN="dl.terhorst.io"
-APP_DIR="/opt/uup-frontend"
+APP_DIR="/opt/dl.terhorst.io"
 SERVICE_NAME="uup-frontend"
 
 # Prüfe ob als root ausgeführt
@@ -274,7 +274,6 @@ a2enmod headers
 
 echo "🌐 Aktiviere Virtual Host..."
 a2ensite $DOMAIN.conf
-a2dissite 000-default
 
 echo "🔄 Starte und aktiviere Services..."
 systemctl daemon-reload
