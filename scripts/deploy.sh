@@ -26,22 +26,11 @@ apt install -y \
     curl \
     git \
     apache2 \
-    nodejs \
-    npm \
     nginx \
     htop \
     ufw \
     certbot \
     python3-certbot-apache
-
-# Node.js Version prüfen und ggf. neuere installieren
-echo "📊 Prüfe Node.js Version..."
-NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 22 ]; then
-    echo "🔄 Installiere neuere Node.js Version..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt-get install -y nodejs
-fi
 
 echo "📦 Installiere Dependencies..."
 cd "$APP_DIR"
