@@ -31,7 +31,7 @@ Ein modernes Web-Frontend für die UUP Dump API, das eine benutzerfreundliche Ob
 ## 📋 Voraussetzungen
 
 ### Server (Debian 12)
-- Root-Zugriff
+- Root-Zugriff (System läuft als root)
 - Apache2 bereits installiert
 - Bestehende httpasswd-Authentifizierung
 - rclone Mount unter `/mnt/onedrive`
@@ -63,7 +63,9 @@ Das Script führt automatisch aus:
 - UUP Dump API-Tools Setup (aria2c, genisoimage)
 - Apache-Konfiguration
 - SSL-Setup (optional)
-- Service-Konfiguration
+- Service-Konfiguration (läuft als root)
+
+**⚠️ Sicherheitshinweis**: Das System läuft als root-Benutzer für maximale Kompatibilität und einfache Verwaltung. Stellen Sie sicher, dass Ihr Server entsprechend abgesichert ist.
 
 ### 3. Manuelle Installation
 
@@ -75,12 +77,9 @@ npm run build
 ```
 
 #### UUP Dump API-Tools
-```bash
-chmod +x scripts/install-uup-dump.sh
-./scripts/install-uup-dump.sh
-```
+UUP Dump Tools werden automatisch durch das Deployment-Script installiert. Keine separaten Schritte nötig.
 
-**Hinweis**: Das Script installiert nur die notwendigen System-Tools (aria2c, genisoimage) und erstellt API-basierte Helper-Scripts. Es wird **kein** lokales UUP-Repository geklont, da die offizielle API von `api.uupdump.net` verwendet wird.
+**Hinweis**: Das System installiert nur die notwendigen System-Tools (aria2c, genisoimage) und erstellt API-basierte Helper-Scripts. Es wird **kein** lokales UUP-Repository geklont, da die offizielle API von `api.uupdump.net` verwendet wird.
 
 #### Apache Konfiguration
 ```bash
@@ -167,8 +166,7 @@ uup-dump-frontend/
 │   ├── index.js          # Express Server
 │   └── uup-wrapper.js    # UUP Dump Integration
 ├── scripts/              # Setup Scripts
-│   ├── deploy.sh         # Automatisches Deployment
-│   └── install-uup-dump.sh # UUP Tools Installation
+│   └── deploy.sh         # Komplettes Deployment (als root)
 ├── config/               # Konfigurationsdateien
 │   └── apache-site.conf  # Apache VirtualHost
 ├── package.json          # Node.js Dependencies
@@ -205,7 +203,7 @@ sudo tail -f /var/log/apache2/dl.terhorst.io_error.log
 
 ### Service-Befehle
 ```bash
-# Status prüfen
+# Status prüfen (Service läuft als root)
 sudo systemctl status uup-frontend
 
 # Neustarten
@@ -220,7 +218,8 @@ sudo journalctl -f -u uup-frontend
 
 ### Updates
 ```bash
-# Code aktualisieren
+# Code aktualisieren (als root im App-Verzeichnis)
+cd /opt/uup-frontend
 git pull origin main
 
 # Dependencies aktualisieren
@@ -264,8 +263,8 @@ npm run build
 
 #### "UUP ISO Creator nicht gefunden"
 ```bash
-# UUP API-Tools neu installieren
-./scripts/install-uup-dump.sh
+# Deployment erneut ausführen
+sudo ./scripts/deploy.sh
 
 # Prüfe installierte Tools
 which aria2c

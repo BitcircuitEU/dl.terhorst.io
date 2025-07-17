@@ -100,7 +100,7 @@ class UUPWrapper {
       const convertScript = '/usr/local/bin/uup-create-iso';
       
       if (!fs.existsSync(convertScript)) {
-        reject(new Error('UUP ISO Creator nicht gefunden. Bitte führen Sie scripts/install-uup-dump.sh aus.'));
+        reject(new Error('UUP ISO Creator nicht gefunden. Bitte führen Sie scripts/deploy.sh erneut aus.'));
         return;
       }
       

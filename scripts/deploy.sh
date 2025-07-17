@@ -9,8 +9,7 @@ echo "🚀 UUP Dump Frontend Deployment startet..."
 
 # Konfiguration
 DOMAIN="dl.terhorst.io"
-APP_DIR="/opt/uup-frontend"
-NODE_USER="uupfrontend"
+APP_DIR="/opt/dl.terhorst.io"
 SERVICE_NAME="uup-frontend"
 
 # Prüfe ob als root ausgeführt
@@ -38,96 +37,132 @@ apt install -y \
 # Node.js Version prüfen und ggf. neuere installieren
 echo "📊 Prüfe Node.js Version..."
 NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
+if [ "$NODE_VERSION" -lt 22 ]; then
     echo "🔄 Installiere neuere Node.js Version..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
 fi
 
-echo "👤 Erstelle System-User..."
-if ! id "$NODE_USER" &>/dev/null; then
-    useradd --system --shell /bin/bash --home "$APP_DIR" --create-home "$NODE_USER"
-fi
-
-echo "📁 Setup Application Directory..."
-mkdir -p "$APP_DIR"
-cp -r ./* "$APP_DIR/"
-chown -R "$NODE_USER:$NODE_USER" "$APP_DIR"
-
-echo "📦 Installiere Node.js Dependencies..."
+echo "📦 Installiere Server Dependencies (Haupt-package.json)..."
 cd "$APP_DIR"
-sudo -u "$NODE_USER" npm install
-sudo -u "$NODE_USER" npm run install-client
+npm install
+
+echo "📦 Installiere Client Dependencies (React Frontend)..."
+npm run install-client
 
 echo "🏗️ Build React Frontend..."
-sudo -u "$NODE_USER" npm run build
+npm run build
 
-echo "⚙️ Setup UUP Dump Tools..."
-./scripts/install-uup-dump.sh
+echo "⚙️ Setup UUP Dump API-Tools..."
+# Installiere UUP-spezifische Pakete
+apt install -y \
+    aria2 \
+    cabextract \
+    wimtools \
+    chntpw \
+    genisoimage \
+    p7zip-full
 
-echo "🔐 Setup Apache Authentication..."
-# Erstelle htpasswd-Datei (Benutzer muss Passwort später setzen)
-if [ ! -f /etc/apache2/.htpasswd ]; then
-    touch /etc/apache2/.htpasswd
-    echo "⚠️  WICHTIG: Setzen Sie das Apache-Passwort mit:"
-    echo "   sudo htpasswd /etc/apache2/.htpasswd admin"
-fi
+# Erstelle UUP-Arbeitsverzeichnis
+UUP_WORK_DIR="/opt/uup-work"
+echo "📁 Erstelle UUP-Arbeitsverzeichnis: $UUP_WORK_DIR"
+mkdir -p "$UUP_WORK_DIR"
 
-echo "🌐 Konfiguriere Apache..."
-# Aktiviere notwendige Module
-a2enmod ssl
-a2enmod proxy
-a2enmod proxy_http
-a2enmod proxy_wstunnel
-a2enmod rewrite
-a2enmod headers
+# Erstelle API-Helper-Script
+echo "📝 Erstelle UUP API Helper Script..."
+cat > "$UUP_WORK_DIR/uup-api-helper.py" << 'EOF'
+#!/usr/bin/env python3
+"""
+UUP Dump API Helper Script
+Verwendet nur die offizielle API von api.uupdump.net
+"""
+import requests
+import json
+import sys
+import os
 
-# Kopiere Site-Konfiguration
-cp config/apache-site.conf /etc/apache2/sites-available/"$DOMAIN".conf
+API_BASE = "https://api.uupdump.net"
 
-# Deaktiviere Default Site und aktiviere unsere
-a2dissite 000-default
-a2ensite "$DOMAIN"
+def download_with_aria2(files_data, work_dir):
+    """Download files using aria2c based on API data"""
+    aria2_input = os.path.join(work_dir, "aria2_input.txt")
+    
+    with open(aria2_input, 'w') as f:
+        for filename, file_info in files_data.items():
+            if file_info.get('url') and file_info['url'] != 'null':
+                f.write(f"{file_info['url']}\n")
+                f.write(f"  out={filename}\n")
+                if file_info.get('sha1'):
+                    f.write(f"  checksum=sha-1={file_info['sha1']}\n")
+                f.write("\n")
+    
+    return aria2_input
 
-echo "🔧 Erstelle Systemd Service..."
-cat > /etc/systemd/system/"$SERVICE_NAME".service << EOF
-[Unit]
-Description=UUP Dump Frontend
-After=network.target
-
-[Service]
-Type=simple
-User=$NODE_USER
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/node server/index.js
-Restart=always
-RestartSec=10
-Environment=NODE_ENV=production
-Environment=PORT=3001
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=$APP_DIR /tmp /mnt/onedrive
-
-[Install]
-WantedBy=multi-user.target
+if __name__ == "__main__":
+    print("UUP API Helper - Verwendet api.uupdump.net")
 EOF
 
-echo "🔥 Setup Firewall..."
-ufw --force enable
-ufw allow ssh
-ufw allow 80/tcp
-ufw allow 443/tcp
+chmod +x "$UUP_WORK_DIR/uup-api-helper.py"
 
-echo "🚀 Starte Services..."
-systemctl daemon-reload
-systemctl enable "$SERVICE_NAME"
-systemctl start "$SERVICE_NAME"
+# Erstelle ISO-Erstellungs-Script
+echo "📝 Erstelle ISO Creator Script..."
+cat > "$UUP_WORK_DIR/create-iso.sh" << 'EOF'
+#!/bin/bash
+# ISO-Erstellungs-Script für Windows-Dateien
 
-# Apache neustarten
-systemctl restart apache2
+WORK_DIR="$1"
+OUTPUT_ISO="$2"
+
+if [ -z "$WORK_DIR" ] || [ -z "$OUTPUT_ISO" ]; then
+    echo "Usage: $0 <work_dir> <output_iso>"
+    exit 1
+fi
+
+cd "$WORK_DIR"
+
+# Prüfe ob Windows-Dateien vorhanden
+if [ -f "sources/install.wim" ] || [ -f "sources/install.esd" ]; then
+    echo "Windows-Dateien gefunden, erstelle ISO..."
+    
+    # Erstelle bootbare Windows-ISO
+    genisoimage \
+        -b boot/etfsboot.com \
+        -no-emul-boot \
+        -boot-load-size 8 \
+        -boot-info-table \
+        -iso-level 2 \
+        -J \
+        -joliet-long \
+        -D \
+        -N \
+        -relaxed-filenames \
+        -V "Windows" \
+        -o "$OUTPUT_ISO" \
+        .
+        
+    echo "ISO erstellt: $OUTPUT_ISO"
+else
+    echo "Keine Windows-Installationsdateien gefunden"
+    exit 1
+fi
+EOF
+
+chmod +x "$UUP_WORK_DIR/create-iso.sh"
+
+# Erstelle symbolische Links
+echo "🔗 Erstelle globale Links..."
+ln -sf "$UUP_WORK_DIR/uup-api-helper.py" /usr/local/bin/uup-api-helper
+ln -sf "$UUP_WORK_DIR/create-iso.sh" /usr/local/bin/uup-create-iso
+
+# Erstelle tmp-Verzeichnis
+mkdir -p /tmp/uup-downloads
+
+# Setze Umgebungsvariablen
+echo "🌍 Setze UUP-Umgebungsvariablen..."
+echo "export UUP_WORK_DIR=$UUP_WORK_DIR" >> /etc/environment
+echo "export UUP_API_BASE=https://api.uupdump.net" >> /etc/environment
+
+echo "✅ UUP Dump API-Tools installiert"
 
 echo "📋 Erstelle Environment-Datei..."
 cat > "$APP_DIR"/.env << EOF
@@ -140,26 +175,7 @@ UUP_API_BASE=https://api.uupdump.net
 DOMAIN=$DOMAIN
 EOF
 
-chown "$NODE_USER:$NODE_USER" "$APP_DIR/.env"
-
-echo "🔒 Setup SSL mit Let's Encrypt..."
-read -p "Möchten Sie SSL-Zertifikate mit Let's Encrypt einrichten? (y/n): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    # Temporär HTTP-Only Konfiguration für Certbot
-    sed -i 's|SSLCertificateFile.*|# SSLCertificateFile /path/to/your/ssl.crt|' /etc/apache2/sites-available/"$DOMAIN".conf
-    sed -i 's|SSLCertificateKeyFile.*|# SSLCertificateKeyFile /path/to/your/ssl.key|' /etc/apache2/sites-available/"$DOMAIN".conf
-    systemctl reload apache2
-    
-    # Hole SSL-Zertifikat
-    certbot --apache -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos --email admin@"$DOMAIN"
-else
-    echo "⚠️  SSL-Setup übersprungen. Bitte konfigurieren Sie SSL manuell."
-fi
-
-echo "📊 Status Check..."
-systemctl status "$SERVICE_NAME" --no-pager
-systemctl status apache2 --no-pager
+chmod 600 "$APP_DIR/.env"
 
 echo ""
 echo "🎉 Deployment abgeschlossen!"
@@ -167,7 +183,7 @@ echo ""
 echo "📋 Zusammenfassung:"
 echo "   🌐 Website: https://$DOMAIN"
 echo "   📁 App-Verzeichnis: $APP_DIR"
-echo "   👤 Service-User: $NODE_USER"
+echo "   👤 Service-User: root"
 echo "   🔧 Service-Name: $SERVICE_NAME"
 echo ""
 echo "⚙️  Nächste Schritte:"
