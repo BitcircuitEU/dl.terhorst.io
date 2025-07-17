@@ -4,6 +4,8 @@ class UUPDumpApp {
         this.socket = null;
         this.builds = [];
         this.images = [];
+        this.folders = [];
+        this.currentFolder = 'all';
         this.selectedBuild = null;
         this.selectedLanguage = null;
         this.selectedEdition = null;
@@ -80,6 +82,13 @@ class UUPDumpApp {
         document.getElementById('closeProgress').addEventListener('click', () => {
             this.closeProgressModal();
         });
+        
+        // Folder Tree Events
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.folder-item[data-folder="all"]')) {
+                this.selectFolder('all');
+            }
+        });
     }
     
     async loadBuilds() {
@@ -107,7 +116,7 @@ class UUPDumpApp {
         loading.classList.add('d-none');
     }
     
-    async loadImages() {
+    async loadImages(folder = 'all') {
         const loading = document.getElementById('imagesLoading');
         const imagesList = document.getElementById('imagesList');
         const imagesEmpty = document.getElementById('imagesEmpty');
@@ -117,13 +126,22 @@ class UUPDumpApp {
         imagesEmpty.classList.add('d-none');
         
         try {
-            const response = await fetch('/api/images');
+            const url = folder === 'all' ? '/api/images' : `/api/images?folder=${encodeURIComponent(folder)}`;
+            const response = await fetch(url);
             const data = await response.json();
             
             if (data.images && data.images.length > 0) {
                 this.images = data.images;
+                this.folders = data.folders || [];
+                this.currentFolder = data.currentFolder || 'all';
+                
                 this.renderImages(this.images);
+                this.updateFolderTree();
+                this.updateBreadcrumb();
+                this.updateCurrentFolderTitle();
             } else {
+                this.folders = data.folders || [];
+                this.updateFolderTree();
                 imagesEmpty.classList.remove('d-none');
             }
         } catch (error) {
@@ -132,6 +150,135 @@ class UUPDumpApp {
         }
         
         loading.classList.add('d-none');
+    }
+    
+    updateFolderTree() {
+        const folderTree = document.getElementById('folderTree');
+        const folderLoading = folderTree.querySelector('.folder-loading');
+        
+        // Entferne Loading-Indikator
+        if (folderLoading) {
+            folderLoading.remove();
+        }
+        
+        // Aktualisiere Anzahl für "Alle Images"
+        const allCount = this.folders.reduce((sum, folder) => sum + folder.count, 0);
+        const allBadge = document.getElementById('count-all');
+        if (allBadge) {
+            allBadge.textContent = allCount;
+        }
+        
+        // Entferne vorhandene Ordner (außer "Alle Images")
+        const existingFolders = folderTree.querySelectorAll('.folder-item:not([data-folder="all"])');
+        existingFolders.forEach(item => item.remove());
+        
+        // Füge Ordner hinzu
+        this.folders.forEach(folder => {
+            if (folder.name !== 'Root') {
+                const folderItem = this.createFolderItem(folder);
+                folderTree.appendChild(folderItem);
+            }
+        });
+        
+        // Aktualisiere aktiven Ordner
+        this.setActiveFolderItem(this.currentFolder);
+    }
+    
+    createFolderItem(folder) {
+        const item = document.createElement('div');
+        item.className = `folder-item level-${folder.level}`;
+        item.setAttribute('data-folder', folder.path);
+        
+        const folderName = folder.name === 'Root' ? 'Root' : folder.name.split(/[/\\]/).pop();
+        
+        item.innerHTML = `
+            <div class="d-flex align-items-center flex-grow-1">
+                <i class="me-2"></i>
+                <span>${folderName}</span>
+            </div>
+            <span class="badge bg-secondary">${folder.count}</span>
+        `;
+        
+        item.addEventListener('click', () => {
+            this.selectFolder(folder.path);
+        });
+        
+        return item;
+    }
+    
+    setActiveFolderItem(folderPath) {
+        // Entferne active von allen Items
+        document.querySelectorAll('.folder-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Setze active für aktuellen Ordner
+        const activeItem = document.querySelector(`[data-folder="${folderPath}"]`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        }
+    }
+    
+    selectFolder(folder) {
+        this.currentFolder = folder;
+        this.loadImages(folder);
+    }
+    
+    updateBreadcrumb() {
+        const breadcrumb = document.getElementById('imageBreadcrumb');
+        const breadcrumbList = breadcrumb.querySelector('.breadcrumb');
+        
+        if (this.currentFolder === 'all') {
+            breadcrumb.classList.add('d-none');
+            return;
+        }
+        
+        breadcrumb.classList.remove('d-none');
+        
+        // Lösche vorhandene Breadcrumb-Items (außer Home)
+        const items = breadcrumbList.querySelectorAll('.breadcrumb-item:not(:first-child)');
+        items.forEach(item => item.remove());
+        
+        // Erstelle Pfad-Segmente
+        const pathSegments = this.currentFolder.split(/[/\\]/);
+        let currentPath = '';
+        
+        pathSegments.forEach((segment, index) => {
+            currentPath += (index > 0 ? '/' : '') + segment;
+            
+            const li = document.createElement('li');
+            li.className = 'breadcrumb-item';
+            
+            if (index === pathSegments.length - 1) {
+                // Letztes Element ist aktiv
+                li.classList.add('active');
+                li.textContent = segment;
+            } else {
+                // Andere Elemente sind Links
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = segment;
+                link.setAttribute('data-folder', currentPath);
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.selectFolder(currentPath);
+                });
+                li.appendChild(link);
+            }
+            
+            breadcrumbList.appendChild(li);
+        });
+    }
+    
+    updateCurrentFolderTitle() {
+        const titleElement = document.getElementById('currentFolderTitle');
+        
+        if (this.currentFolder === 'all') {
+            titleElement.textContent = 'Alle Images';
+        } else {
+            const folderName = this.currentFolder.split(/[/\\]/).pop();
+            titleElement.textContent = folderName;
+        }
     }
     
     renderBuilds(builds) {

@@ -195,29 +195,90 @@ async function findAllImages(dir, baseDir, images = []) {
   return images;
 }
 
-// Hole vorhandene Images
-app.get('/api/images', authenticate, async (req, res) => {
+// Hole Ordner-Struktur
+app.get('/api/folders', authenticate, async (req, res) => {
   try {
     if (!fs.existsSync(MOUNT_PATH)) {
-      return res.json({ images: [] });
+      return res.json({ folders: [] });
     }
     
     const images = await findAllImages(MOUNT_PATH, MOUNT_PATH);
     
+    // Erstelle Ordner-Struktur
+    const folderStructure = buildFolderStructure(images);
+    
+    res.json({ folders: folderStructure });
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Ordner:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Ordner' });
+  }
+});
+
+// Hole vorhandene Images (optional gefiltert nach Ordner)
+app.get('/api/images', authenticate, async (req, res) => {
+  try {
+    if (!fs.existsSync(MOUNT_PATH)) {
+      return res.json({ images: [], folders: [] });
+    }
+    
+    const images = await findAllImages(MOUNT_PATH, MOUNT_PATH);
+    const { folder } = req.query;
+    
+    // Filtere nach Ordner falls angegeben
+    let filteredImages = images;
+    if (folder && folder !== 'all') {
+      filteredImages = images.filter(image => image.category === folder);
+    }
+    
     // Sortiere nach Kategorie und dann nach Name
-    images.sort((a, b) => {
+    filteredImages.sort((a, b) => {
       if (a.category !== b.category) {
         return a.category.localeCompare(b.category);
       }
       return a.name.localeCompare(b.name);
     });
     
-    res.json({ images });
+    // Erstelle auch Ordner-Struktur
+    const folderStructure = buildFolderStructure(images);
+    
+    res.json({ 
+      images: filteredImages,
+      folders: folderStructure,
+      currentFolder: folder || 'all',
+      totalCount: images.length
+    });
   } catch (error) {
     console.error('Fehler beim Abrufen der Images:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen der Images' });
   }
 });
+
+// Hilfsfunktion: Erstelle Ordner-Struktur aus Images
+function buildFolderStructure(images) {
+  const folderCounts = {};
+  
+  // Zähle Images pro Ordner
+  images.forEach(image => {
+    const category = image.category || 'Root';
+    if (!folderCounts[category]) {
+      folderCounts[category] = 0;
+    }
+    folderCounts[category]++;
+  });
+  
+  // Erstelle Ordner-Array
+  const folders = Object.entries(folderCounts).map(([folder, count]) => ({
+    name: folder,
+    path: folder,
+    count: count,
+    level: (folder.match(/[/\\]/g) || []).length
+  }));
+  
+  // Sortiere nach Pfad
+  folders.sort((a, b) => a.path.localeCompare(b.path));
+  
+  return folders;
+}
 
 // Lösche Image
 app.delete('/api/images/*', authenticate, async (req, res) => {

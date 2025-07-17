@@ -41,30 +41,73 @@
         <div class="tab-content" id="mainTabsContent">
             <!-- Images Tab -->
             <div class="tab-pane fade show active" id="images" role="tabpanel">
-                <div class="card bg-secondary">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-hdd me-2"></i>Gespeicherte Images
-                        </h5>
-                        <button class="btn btn-outline-light" id="refreshImages">
-                            <i class="fas fa-sync-alt me-2"></i>Aktualisieren
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <!-- Loading Spinner -->
-                        <div id="imagesLoading" class="text-center py-4 d-none">
-                            <div class="spinner-border text-primary" role="status"></div>
-                            <p class="mt-2">Images werden geladen...</p>
+                <div class="row">
+                    <!-- Sidebar mit Ordner-Baum -->
+                    <div class="col-md-3">
+                        <div class="card bg-secondary h-100">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-folder-tree me-2"></i>Ordner
+                                </h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <!-- Ordner-Baum -->
+                                <div id="folderTree" class="folder-tree">
+                                    <div class="folder-item active" data-folder="all">
+                                        <i class="fas fa-globe me-2"></i>Alle Images
+                                        <span class="badge bg-primary ms-auto" id="count-all">0</span>
+                                    </div>
+                                    <div class="folder-loading text-center p-3">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        <small class="d-block mt-1">Ordner laden...</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    
+                    <!-- Haupt-Content -->
+                    <div class="col-md-9">
+                        <div class="card bg-secondary">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-hdd me-2"></i>
+                                    <span id="currentFolderTitle">Gespeicherte Images</span>
+                                </h5>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-light" id="refreshImages">
+                                        <i class="fas fa-sync-alt me-2"></i>Aktualisieren
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Breadcrumb -->
+                                <nav aria-label="breadcrumb" id="imageBreadcrumb" class="d-none">
+                                    <ol class="breadcrumb">
+                                        <li class="breadcrumb-item">
+                                            <a href="#" data-folder="all">
+                                                <i class="fas fa-home me-1"></i>Root
+                                            </a>
+                                        </li>
+                                    </ol>
+                                </nav>
+                                
+                                <!-- Loading Spinner -->
+                                <div id="imagesLoading" class="text-center py-4 d-none">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <p class="mt-2">Images werden geladen...</p>
+                                </div>
 
-                        <!-- Images List -->
-                        <div id="imagesList" class="row"></div>
-                        
-                        <!-- Empty State -->
-                        <div id="imagesEmpty" class="text-center py-5 d-none">
-                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
-                            <h6 class="text-muted">Keine Images gefunden</h6>
-                            <p class="text-muted">Verzeichnis /mnt/onedrive/bootimages ist leer oder nicht verfügbar.</p>
+                                <!-- Images List -->
+                                <div id="imagesList" class="row"></div>
+                                
+                                <!-- Empty State -->
+                                <div id="imagesEmpty" class="text-center py-5 d-none">
+                                    <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                                    <h6 class="text-muted">Keine Images gefunden</h6>
+                                    <p class="text-muted">Verzeichnis ist leer oder nicht verfügbar.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
