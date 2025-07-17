@@ -62,17 +62,65 @@ app.get('/', authenticate, (req, res) => {
 
 // API Routes
 
-// Hole verfügbare Builds
+// Hole verfügbare Builds mit erweiterten Filtern
 app.get('/api/builds', authenticate, async (req, res) => {
   try {
-    const { search, sortByDate } = req.query;
+    const { search, sortByDate, ring, arch, buildType } = req.query;
     const params = new URLSearchParams();
     
     if (search) params.append('search', search);
     if (sortByDate) params.append('sortByDate', sortByDate);
     
+    // Erweiterte Filter-Parameter
+    if (ring) params.append('ring', ring);
+    if (arch) params.append('arch', arch);
+    if (buildType) params.append('buildType', buildType);
+    
+    console.log(`UUP API Request: ${UUP_API_BASE}/listid.php?${params}`);
+    
     const response = await axios.get(`${UUP_API_BASE}/listid.php?${params}`);
-    res.json(response.data);
+    
+    let builds = response.data.response?.builds || [];
+    
+    // Client-seitige Filterung falls die UUP API bestimmte Filter nicht unterstützt
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase();
+      builds = builds.filter(build => 
+        build.title.toLowerCase().includes(searchLower) ||
+        build.build.toString().includes(searchLower) ||
+        build.arch.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    if (arch && arch !== '') {
+      builds = builds.filter(build => build.arch === arch);
+    }
+    
+    if (buildType && buildType !== '') {
+      builds = builds.filter(build => {
+        const title = build.title.toLowerCase();
+        switch (buildType) {
+          case 'feature':
+            return title.includes('feature') || title.includes('update') && !title.includes('cumulative');
+          case 'cumulative':
+            return title.includes('cumulative') || title.includes('kb');
+          case 'insider':
+            return title.includes('insider') || title.includes('preview') || title.includes('beta') || title.includes('dev');
+          case 'server':
+            return title.includes('server');
+          default:
+            return true;
+        }
+      });
+    }
+    
+    res.json({
+      ...response.data,
+      response: {
+        ...response.data.response,
+        builds: builds
+      }
+    });
   } catch (error) {
     console.error('Fehler beim Abrufen der Builds:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen der Builds' });

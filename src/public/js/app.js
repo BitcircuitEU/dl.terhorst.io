@@ -3,12 +3,21 @@ class UUPDumpApp {
     constructor() {
         this.socket = null;
         this.builds = [];
+        this.allBuilds = []; // Backup für Client-seitige Filterung
         this.images = [];
         this.folders = [];
         this.currentFolder = 'all';
         this.selectedBuild = null;
         this.selectedLanguage = null;
         this.selectedEdition = null;
+        this.filtersVisible = false;
+        this.currentFilters = {
+            search: '',
+            ring: '',
+            arch: '',
+            buildType: '',
+            sort: 'date-desc'
+        };
         
         this.init();
     }
@@ -58,8 +67,32 @@ class UUPDumpApp {
         
         // Search-Events
         document.getElementById('searchInput').addEventListener('input', 
-            this.debounce((e) => this.filterBuilds(e.target.value), 300)
+            this.debounce((e) => {
+                this.currentFilters.search = e.target.value;
+                this.applyAllFilters();
+            }, 300)
         );
+        
+        // Filter-Events
+        document.getElementById('toggleFilters').addEventListener('click', () => {
+            this.toggleFiltersPanel();
+        });
+        
+        document.getElementById('applyFilters').addEventListener('click', () => {
+            this.collectFiltersAndApply();
+        });
+        
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            this.clearAllFilters();
+        });
+        
+        // Filter change events
+        ['ringFilter', 'archFilter', 'buildTypeFilter', 'sortFilter'].forEach(filterId => {
+            document.getElementById(filterId).addEventListener('change', (e) => {
+                const filterType = filterId.replace('Filter', '');
+                this.currentFilters[filterType === 'sort' ? 'sort' : filterType] = e.target.value;
+            });
+        });
         
         // Refresh-Events
         document.getElementById('refreshBuilds').addEventListener('click', () => {
@@ -91,7 +124,7 @@ class UUPDumpApp {
         });
     }
     
-    async loadBuilds() {
+    async loadBuilds(useFilters = false) {
         const loading = document.getElementById('buildsLoading');
         const buildsList = document.getElementById('buildsList');
         
@@ -99,11 +132,33 @@ class UUPDumpApp {
         buildsList.innerHTML = '';
         
         try {
-            const response = await fetch('/api/builds');
+            let url = '/api/builds';
+            
+            if (useFilters) {
+                const params = new URLSearchParams();
+                
+                if (this.currentFilters.search) params.append('search', this.currentFilters.search);
+                if (this.currentFilters.ring) params.append('ring', this.currentFilters.ring);
+                if (this.currentFilters.arch) params.append('arch', this.currentFilters.arch);
+                if (this.currentFilters.buildType) params.append('buildType', this.currentFilters.buildType);
+                if (this.currentFilters.sort === 'date-asc' || this.currentFilters.sort === 'date-desc') {
+                    params.append('sortByDate', this.currentFilters.sort === 'date-desc' ? '1' : '0');
+                }
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+            }
+            
+            const response = await fetch(url);
             const data = await response.json();
             
             if (data.response && data.response.builds) {
-                this.builds = data.response.builds;
+                this.allBuilds = data.response.builds;
+                this.builds = [...this.allBuilds];
+                
+                // Client-seitige Sortierung anwenden wenn nötig
+                this.applySorting();
                 this.renderBuilds(this.builds);
             } else {
                 this.showAlert('Keine Builds gefunden', 'warning');
@@ -716,19 +771,93 @@ class UUPDumpApp {
         }
     }
     
-    filterBuilds(searchTerm) {
-        if (!searchTerm) {
-            this.renderBuilds(this.builds);
-            return;
+    toggleFiltersPanel() {
+        const filtersPanel = document.getElementById('advancedFilters');
+        const toggleBtn = document.getElementById('toggleFilters');
+        
+        this.filtersVisible = !this.filtersVisible;
+        
+        if (this.filtersVisible) {
+            filtersPanel.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="fas fa-filter me-2"></i>Filter ausblenden';
+            setTimeout(() => filtersPanel.classList.add('show'), 10);
+        } else {
+            filtersPanel.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="fas fa-filter me-2"></i>Filter';
+            filtersPanel.classList.remove('show');
+        }
+    }
+    
+    collectFiltersAndApply() {
+        this.currentFilters.ring = document.getElementById('ringFilter').value;
+        this.currentFilters.arch = document.getElementById('archFilter').value;
+        this.currentFilters.buildType = document.getElementById('buildTypeFilter').value;
+        this.currentFilters.sort = document.getElementById('sortFilter').value;
+        
+        this.loadBuilds(true);
+    }
+    
+    clearAllFilters() {
+        // Reset all filter values
+        this.currentFilters = {
+            search: '',
+            ring: '',
+            arch: '',
+            buildType: '',
+            sort: 'date-desc'
+        };
+        
+        // Reset UI elements
+        document.getElementById('searchInput').value = '';
+        document.getElementById('ringFilter').value = '';
+        document.getElementById('archFilter').value = '';
+        document.getElementById('buildTypeFilter').value = '';
+        document.getElementById('sortFilter').value = 'date-desc';
+        
+        // Reload builds without filters
+        this.loadBuilds(false);
+    }
+    
+    applyAllFilters() {
+        // Client-seitige Filterung basierend auf aktuell geladenen Builds
+        let filteredBuilds = [...this.allBuilds];
+        
+        // Suchfilter
+        if (this.currentFilters.search && this.currentFilters.search.trim()) {
+            const searchLower = this.currentFilters.search.toLowerCase();
+            filteredBuilds = filteredBuilds.filter(build => 
+                build.title.toLowerCase().includes(searchLower) ||
+                build.build.toString().includes(searchLower) ||
+                build.arch.toLowerCase().includes(searchLower)
+            );
         }
         
-        const filteredBuilds = this.builds.filter(build => 
-            build.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            build.build.toString().includes(searchTerm) ||
-            build.arch.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        
-        this.renderBuilds(filteredBuilds);
+        this.builds = filteredBuilds;
+        this.applySorting();
+        this.renderBuilds(this.builds);
+    }
+    
+    applySorting() {
+        switch (this.currentFilters.sort) {
+            case 'date-asc':
+                this.builds.sort((a, b) => new Date(a.created * 1000) - new Date(b.created * 1000));
+                break;
+            case 'date-desc':
+                this.builds.sort((a, b) => new Date(b.created * 1000) - new Date(a.created * 1000));
+                break;
+            case 'build-asc':
+                this.builds.sort((a, b) => parseInt(a.build) - parseInt(b.build));
+                break;
+            case 'build-desc':
+                this.builds.sort((a, b) => parseInt(b.build) - parseInt(a.build));
+                break;
+            case 'title-asc':
+                this.builds.sort((a, b) => a.title.localeCompare(b.title, 'de'));
+                break;
+            case 'title-desc':
+                this.builds.sort((a, b) => b.title.localeCompare(a.title, 'de'));
+                break;
+        }
     }
     
     showAlert(message, type = 'info') {

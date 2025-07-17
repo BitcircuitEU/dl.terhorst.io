@@ -124,16 +124,84 @@
                     <div class="card-body">
                         <!-- Search Controls -->
                         <div class="row mb-3">
-                            <div class="col-md-8">
+                            <div class="col-md-6">
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-search"></i></span>
                                     <input type="text" class="form-control" id="searchInput" placeholder="Build durchsuchen...">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <button class="btn btn-outline-light w-100" id="toggleFilters">
+                                    <i class="fas fa-filter me-2"></i>Filter
+                                </button>
+                            </div>
+                            <div class="col-md-3">
                                 <button class="btn btn-outline-light w-100" id="refreshBuilds">
                                     <i class="fas fa-sync-alt me-2"></i>Aktualisieren
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Filters -->
+                        <div id="advancedFilters" class="card bg-dark border-primary mb-3" style="display: none;">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-sliders-h me-2"></i>Erweiterte Filter
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label for="ringFilter" class="form-label">Release Ring:</label>
+                                        <select class="form-select" id="ringFilter">
+                                            <option value="">Alle Rings</option>
+                                            <option value="Retail">Release (Retail)</option>
+                                            <option value="Beta">Beta Channel</option>
+                                            <option value="Dev">Dev Channel</option>
+                                            <option value="Canary">Canary Channel</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="archFilter" class="form-label">Architektur:</label>
+                                        <select class="form-select" id="archFilter">
+                                            <option value="">Alle Architekturen</option>
+                                            <option value="amd64">AMD64 (x64)</option>
+                                            <option value="arm64">ARM64</option>
+                                            <option value="x86">x86 (32-bit)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="sortFilter" class="form-label">Sortierung:</label>
+                                        <select class="form-select" id="sortFilter">
+                                            <option value="date-desc">Neueste zuerst</option>
+                                            <option value="date-asc">Älteste zuerst</option>
+                                            <option value="build-desc">Build-Nummer (hoch-niedrig)</option>
+                                            <option value="build-asc">Build-Nummer (niedrig-hoch)</option>
+                                            <option value="title-asc">Titel (A-Z)</option>
+                                            <option value="title-desc">Titel (Z-A)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="buildTypeFilter" class="form-label">Build-Typ:</label>
+                                        <select class="form-select" id="buildTypeFilter">
+                                            <option value="">Alle Typen</option>
+                                            <option value="feature">Feature Updates</option>
+                                            <option value="cumulative">Kumulative Updates</option>
+                                            <option value="insider">Insider Previews</option>
+                                            <option value="server">Windows Server</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <button class="btn btn-primary me-2" id="applyFilters">
+                                            <i class="fas fa-search me-1"></i>Filter anwenden
+                                        </button>
+                                        <button class="btn btn-outline-secondary" id="clearFilters">
+                                            <i class="fas fa-times me-1"></i>Filter zurücksetzen
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
